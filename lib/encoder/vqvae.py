@@ -31,7 +31,7 @@ class VectorQuantizer(nn.Module):
         # Add embedding gradients
         z_q = z + (z_q - z).detach()
         
-        return loss, z_q
+        return loss, z_q, min_distances_indices
 
 class VQVAE(nn.Module):
     def __init__(self, encoder, decoder, vq):
@@ -40,9 +40,17 @@ class VQVAE(nn.Module):
         self.decoder = decoder
         self.vq = vq
 
+    def encode(self, x):
+        return self.encoder(x)
+
+    def quantize(self, x):
+        z = self.encoder(x)
+        _, _, min_distances_indices = self.vq(z)
+        return min_distances_indices
+
     def forward(self, x):
         z = self.encoder(x)
-        loss, quantized = self.vq(z)
+        loss, quantized, min_distances_indices = self.vq(z)
         x_recon = self.decoder(quantized)
 
-        return loss, x_recon
+        return loss, x_recon, min_distances_indices, quantized

@@ -1,5 +1,6 @@
 import torch
 from torch import nn, optim
+from tqdm import tqdm
 
 class AutoencoderTrainer:
     def __init__(self, model, learning_rate, device='cuda'):
@@ -11,16 +12,17 @@ class AutoencoderTrainer:
 
     def train(self, dataloader, num_epochs):
         self.model.train()
-        for epoch in range(num_epochs):
-            for data in dataloader:
+        for epoch in tqdm(range(num_epochs)):
+            for batch in dataloader:
+                data = batch['array']
                 data = data.float()
                 self.optimizer.zero_grad()
-                outputs, x_recon = self.model(data)
-                loss = self.criterion(outputs, data)
-                loss = loss + x_recon
+                commitment_loss, x_recon, indices, quantized = self.model(data)
+                reconsctruction_loss = self.criterion(x_recon, data)
+                loss = commitment_loss + reconsctruction_loss
                 loss.backward()
                 self.optimizer.step()
-            print(f'Epoch:{epoch+1}, Loss:{loss.item()}')
+            print(f"Epoch:{epoch+1}, Loss:{loss.item()}")
 
     def test(self, dataloader):
         self.model.eval()

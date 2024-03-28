@@ -1,6 +1,8 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+from ..config import *
+
 
 mp_drawing = mp.solutions.drawing_utils
 mp_holistic = mp.solutions.holistic
@@ -95,8 +97,8 @@ def get_pose_estimation(video_path):
 
     # NOTE: There can be undetectable landmarks, check out later
     with mp_holistic.Holistic(
-            min_detection_confidence=0.5, 
-            min_tracking_confidence=0.5
+            min_detection_confidence=MEDIAPIPE_MIN_DETECTION_CONFIDENCE, 
+            min_tracking_confidence=MEDIAPIPE_MIN_TRACKING_CONFIDENCE
         ) as pose:
         
         while cap.isOpened():
