@@ -1,13 +1,22 @@
+import os
 import cv2
 import mediapipe as mp
 import numpy as np
 from ..config import *
 
-
-mp_drawing = mp.solutions.drawing_utils
 mp_holistic = mp.solutions.holistic
 
-def get_pose_estimation(video_path):
+def get_pose_estimation( video_path : str) -> dict:
+    """
+    Uses MediaPipe detectors for pose and hand landmark detection and returns a dictionary containing the detected landmarks.
+
+    :param str video_path: path string for .mp4 file
+    :return dict landmark: detected landmarks as dictionary
+    """
+
+    assert type(video_path) is str, f"{video_path} type must be 'str' ."
+    assert os.path.exists(video_path), f"{video_path} does not exist !"
+    assert video_path.endswith(".mp4"), f"{video_path} must end with '.mp4' ."
 
     cap = cv2.VideoCapture(video_path)
 
@@ -97,8 +106,8 @@ def get_pose_estimation(video_path):
 
     # NOTE: There can be undetectable landmarks, check out later
     with mp_holistic.Holistic(
-            min_detection_confidence=MEDIAPIPE_MIN_DETECTION_CONFIDENCE, 
-            min_tracking_confidence=MEDIAPIPE_MIN_TRACKING_CONFIDENCE
+            min_detection_confidence=GLOBAL_CONFIG.MEDIAPIPE_MIN_DETECTION_CONFIDENCE, 
+            min_tracking_confidence=GLOBAL_CONFIG.MEDIAPIPE_MIN_TRACKING_CONFIDENCE
         ) as pose:
         
         while cap.isOpened():
