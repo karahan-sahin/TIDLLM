@@ -3,8 +3,19 @@
 # When needed, all configurations can be easily saved
 
 GLOBAL_CONFIG = {
-    "MEDIAPIPE_MIN_DETECTION_CONFIDENCE" : 0.01,
-    "MEDIAPIPE_MIN_TRACKING_CONFIDENCE" : 0.01,
+    ################################################################################
+    # Please visit:
+    #   https://github.com/google/mediapipe/blob/master/docs/solutions/holistic.md
+    ################################################################################
+    "MEDIAPIPE_STATIC_IMAGE_MODE" : False,      # If True, person detection runs every input image. Default to False.
+    "MEDIAPIPE_MODEL_COMPLEXITY" : 1,           # 0, 1, 2. Default to 1
+    "MEDIAPIPE_SMOOTH_LANDMARKS" : True,        # Default to True
+    "MEDIAPIPE_ENABLE_SEGMENTATION" : False,    # Default to False
+    "MEDIAPIPE_SMOOTH_SEGMENTATION" : True,     # Default to True
+    "MEDIAPIPE_REFINE_FACE_LANDMARKS" : False,  # Default to False
+    "MEDIAPIPE_MIN_DETECTION_CONFIDENCE" : 0.5, # Between [0, 1]
+    "MEDIAPIPE_MIN_TRACKING_CONFIDENCE" : 0.5,  # Between [0, 1]
+    ################################################################################
     "MODEL_ENCODER_INPUT_DIM" : 225,
     "MODEL_ENCODER_HIDDEN_DIM" : 256,
     "MODEL_ENCODER_OUTPUT_DIM" : 768,
