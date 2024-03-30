@@ -9,16 +9,29 @@ mp_holistic = mp.solutions.holistic
 def get_pose_estimation( video_path : str) -> dict:
     """
     Uses MediaPipe detectors for pose and hand landmark detection and returns a dictionary containing the detected landmarks.
+    Please visit:
+        https://developers.google.com/mediapipe/solutions/vision/holistic_landmarker
+        https://developers.google.com/mediapipe/solutions/vision/pose_landmarker
+        https://developers.google.com/mediapipe/solutions/vision/hand_landmarker
 
-    :param str video_path: path string for .mp4 file
-    :return dict landmark: detected landmarks as dictionary
+    Parameters:
+    -----------
+        video_path : str
+            path string for .mp4 file
+
+    Returns:
+    --------
+        landmarks : dict
+            x,y,z coordinates of the detected landmarks as dictionary
+            with the following keys `pose`, `right`, `left`;
+            in total length of 75 (33 pose + 21 left hand + 21 right hand).
     """
 
     assert type(video_path) is str, f"{video_path} type must be 'str' ."
-    assert os.path.exists(video_path), f"{video_path} does not exist !"
     assert video_path.endswith(".mp4"), f"{video_path} must end with '.mp4' ."
+    assert os.path.exists(video_path), f"{video_path} does not exist !"
 
-    cap = cv2.VideoCapture(video_path)
+    video = cv2.VideoCapture(video_path)
 
     landmarks = {
         'pose': {
@@ -104,19 +117,37 @@ def get_pose_estimation( video_path : str) -> dict:
         }
     }
 
-    # NOTE: There can be undetectable landmarks, check out later
+    # The MediaPipe Holistic Landmarker task lets you combine components of the 
+    # pose, face, and hand landmarkers to create a complete landmarker for the human body.
+    # Please visit:
+    #   https://github.com/google/mediapipe/blob/master/docs/solutions/holistic.md
     with mp_holistic.Holistic(
+            static_image_mode=GLOBAL_CONFIG.MEDIAPIPE_STATIC_IMAGE_MODE,
+            model_complexity=GLOBAL_CONFIG.MEDIAPIPE_MODEL_COMPLEXITY,
+            smooth_landmarks=GLOBAL_CONFIG.MEDIAPIPE_SMOOTH_LANDMARKS,
+            enable_segmentation=GLOBAL_CONFIG.MEDIAPIPE_ENABLE_SEGMENTATION,
+            smooth_segmentation=GLOBAL_CONFIG.MEDIAPIPE_SMOOTH_SEGMENTATION,
+            refine_face_landmarks=GLOBAL_CONFIG.MEDIAPIPE_REFINE_FACE_LANDMARKS,
             min_detection_confidence=GLOBAL_CONFIG.MEDIAPIPE_MIN_DETECTION_CONFIDENCE, 
-            min_tracking_confidence=GLOBAL_CONFIG.MEDIAPIPE_MIN_TRACKING_CONFIDENCE
-        ) as pose:
+            min_tracking_confidence=GLOBAL_CONFIG.MEDIAPIPE_MIN_TRACKING_CONFIDENCE,
+        ) as holistic:
         
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
+        
+        # NOTE: There can be undetectable landmarks, check out later
+        while video.isOpened():
+            success, frame = video.read()
+            if not success:
+                print("Frame capturing is NOT succesfull!")
                 break
 
+            # To improve performance, optionally mark the image as not writeable to
+            # pass by reference.
+            frame.flags.writeable = False
+
             # Convert the BGR image to RGB before processing.
-            results = pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            results = holistic.process(frame)
 
             if results.pose_landmarks:
                 # Append pose landmarks to the list
@@ -125,7 +156,6 @@ def get_pose_estimation( video_path : str) -> dict:
                         landmark.x,
                         landmark.y,
                         landmark.z,
-                        landmark.visibility,
                     ]))
             else:
                 for landmark_name in landmarks['pose'].keys():
@@ -143,7 +173,6 @@ def get_pose_estimation( video_path : str) -> dict:
                         landmark.x,
                         landmark.y,
                         landmark.z,
-                        landmark.visibility,
                     ]))
             else:
                 for landmark_name in landmarks['right'].keys():
@@ -161,7 +190,6 @@ def get_pose_estimation( video_path : str) -> dict:
                         landmark.x,
                         landmark.y,
                         landmark.z,
-                        landmark.visibility,
                     ]))
             else:
                 for landmark_name in landmarks['left'].keys():
@@ -169,9 +197,8 @@ def get_pose_estimation( video_path : str) -> dict:
                         None,
                         None,
                         None,
-                        None,
                     ]))
 
-    cap.release()
+    video.release()
 
     return landmarks
