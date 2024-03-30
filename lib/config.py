@@ -2,6 +2,8 @@
 # Why to use dictionary instead of global variables?
 # When needed, all configurations can be easily saved
 
+from types import SimpleNamespace
+
 GLOBAL_CONFIG = {
     ################################################################################
     # Please visit:
@@ -30,6 +32,8 @@ GLOBAL_CONFIG = {
     "LEARNING_RATE" : 1e-5,
 }
 
+GLOBAL_CONFIG = SimpleNamespace(**GLOBAL_CONFIG)
+
 def write_global_config_to_file(filepath: str):
 
     """ Writes GLOBAL_CONFIG to given filepath. """
@@ -45,7 +49,7 @@ def write_global_config_to_file(filepath: str):
 
         print(f'GLOBAL_CONFIG saved successfully to {filepath}')
 
-def read_global_config_from_file(filepath: str):
+def read_global_config_from_file(filepath: str) -> any:
     """ Reads given filepath and stores it as GLOBAL_CONFIG. """
 
     import os
@@ -56,7 +60,6 @@ def read_global_config_from_file(filepath: str):
     assert os.path.exists(filepath), f"{filepath} does not exist !"
 
     with open(filepath, 'rb') as fp:
-        global GLOBAL_CONFIG
-        GLOBAL_CONFIG = pickle.load(fp)
-
+        config = pickle.load(fp)
         print(f'GLOBAL_CONFIG restored succesfully from {filepath}.')
+        return config
