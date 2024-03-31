@@ -4,9 +4,7 @@ import mediapipe as mp
 import numpy as np
 from ..config import *
 
-mp_holistic = mp.solutions.holistic
-
-def get_pose_estimation( video_path : str) -> dict:
+def get_pose_estimation( video_path : str, with_info : bool = False) -> dict:
     """
     Uses MediaPipe detectors for pose and hand landmark detection and returns a dictionary containing the detected landmarks.
     Please visit:
@@ -18,6 +16,12 @@ def get_pose_estimation( video_path : str) -> dict:
     -----------
         video_path : str
             path string for .mp4 file
+        with_info: bool
+            : logs `missing_left_hand` if MediaPipe could not detect left hand
+            : logs `missing_right_hand` if MediaPipe could not detect right hand
+            : logs `missing_pose` if MediaPipe could not detect pose
+            : logs `total_number_of_frames` in given video
+            : logs `configuration` parameters set for MediaPipe detectors
 
     Returns:
     --------
@@ -25,6 +29,9 @@ def get_pose_estimation( video_path : str) -> dict:
             x,y,z coordinates of the detected landmarks as dictionary
             with the following keys `pose`, `right`, `left`;
             in total length of 75 (33 pose + 21 left hand + 21 right hand).
+        info : list
+            if `with_info` set True, returns a list with the following structure
+            `video_name`, `info`, `value`
     """
 
     assert type(video_path) is str, f"{video_path} type must be 'str' ."
@@ -121,7 +128,7 @@ def get_pose_estimation( video_path : str) -> dict:
     # pose, face, and hand landmarkers to create a complete landmarker for the human body.
     # Please visit:
     #   https://github.com/google/mediapipe/blob/master/docs/solutions/holistic.md
-    with mp_holistic.Holistic(
+    with mp.solutions.holistic.Holistic(
             static_image_mode=GLOBAL_CONFIG.MEDIAPIPE_STATIC_IMAGE_MODE,
             model_complexity=GLOBAL_CONFIG.MEDIAPIPE_MODEL_COMPLEXITY,
             smooth_landmarks=GLOBAL_CONFIG.MEDIAPIPE_SMOOTH_LANDMARKS,
@@ -133,12 +140,16 @@ def get_pose_estimation( video_path : str) -> dict:
         ) as holistic:
         
         
-        # NOTE: There can be undetectable landmarks, check out later
+        # NOTE: There can be undetectable landmarks, log them if `with_info` set to True
+        frame_idx = 0
+        info = []
+
         while video.isOpened():
             success, frame = video.read()
             if not success:
-                print("Frame capturing is NOT succesfull!")
                 break
+            
+            frame_idx = frame_idx + 1
 
             # To improve performance, optionally mark the image as not writeable to
             # pass by reference.
@@ -158,6 +169,9 @@ def get_pose_estimation( video_path : str) -> dict:
                         landmark.z,
                     ]))
             else:
+                if with_info:
+                    info.append([f"{video_path}", "missing_pose", f"{frame_idx}"])
+                    
                 for landmark_name in landmarks['pose'].keys():
                     landmarks['pose'][landmark_name].append(np.array([
                         None,
@@ -175,6 +189,9 @@ def get_pose_estimation( video_path : str) -> dict:
                         landmark.z,
                     ]))
             else:
+                if with_info:
+                    info.append([f"{video_path}", "missing_right_hand", f"{frame_idx}"])
+
                 for landmark_name in landmarks['right'].keys():
                     landmarks['right'][landmark_name].append(np.array([
                         None,
@@ -192,6 +209,9 @@ def get_pose_estimation( video_path : str) -> dict:
                         landmark.z,
                     ]))
             else:
+                if with_info:
+                    info.append([f"{video_path}", "missing_left_hand", f"{frame_idx}"])
+
                 for landmark_name in landmarks['left'].keys():
                     landmarks['left'][landmark_name].append(np.array([
                         None,
@@ -201,4 +221,9 @@ def get_pose_estimation( video_path : str) -> dict:
 
     video.release()
 
-    return landmarks
+    if with_info:
+        info.append([f"{video_path}", "total_number_of_frames", f"{frame_idx}"])
+        info.append([f"{video_path}", "configuration", f"{GLOBAL_CONFIG}"])
+        return landmarks, info
+    else:
+        return landmarks, None
