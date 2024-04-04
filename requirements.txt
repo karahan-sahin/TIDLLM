@@ -1,3 +1,4 @@
 torch
 opencv-python
-medipipe
+# medipipe
+vector-quantize-pytorch

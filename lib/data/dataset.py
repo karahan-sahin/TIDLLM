@@ -10,6 +10,7 @@ class PoseDataset(Dataset):
     def __init__(self, data, transform=None):
         self.paths = data
         self.tokens = []
+        self.frames = []
         self.load_data(self.paths)
         self.transform = transform
 
@@ -23,6 +24,7 @@ class PoseDataset(Dataset):
                 data.append(array)
 
             self.tokens += [ path.split('/')[-1] ] * array.shape[0]
+            self.frames += list(range(array.shape[0]))
 
         self.data = np.vstack(data)
         self.data = self.data.astype(np.float32)
@@ -35,4 +37,5 @@ class PoseDataset(Dataset):
         return {
             'array': self.data[idx,:],
             'token': self.tokens[idx],
+            'frame': self.frames[idx]
         }
