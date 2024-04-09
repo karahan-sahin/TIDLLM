@@ -1,3 +1,5 @@
 torch
 opencv-python
-medipipe
+# medipipe
+vector-quantize-pytorch
+torch_geometric
