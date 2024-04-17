@@ -9,15 +9,6 @@ import torch.nn.functional as F
 import wandb
 from lib.config import *
 
-# def codebook_diversity_loss(embedding_weights):
-#     normed_weights = F.normalize(embedding_weights, p=2, dim=1)
-#     similarity = torch.matmul(normed_weights, normed_weights.T)
-#     # Remove self-similarity by setting diagonal to zero
-#     similarity.fill_diagonal_(0)
-#     diversity_loss = torch.mean(similarity)
-#     return diversity_loss
-
-
 class AutoencoderTrainer:
     def __init__(
         self,
@@ -202,24 +193,22 @@ class AutoencoderTrainer:
                 )
 
             self.save_to_wandb(epoch)
+            
+            print(f"""
+    ***
+    Epoch:{epoch+1}, 
+    Train Commitment Loss: {np.array(self.losses['train']['commitment'][epoch]).sum()}, 
+    Train Reconstruction Loss: {np.array(self.losses['train']['reconstruction'][epoch]).sum()}, 
+    Train Quantization Tokens:
+    {pd.DataFrame(pd.Series(self.losses['train']['quantization'][epoch]).value_counts()).T.to_markdown()}, 
 
-            print(
-                f"""
-***
-Epoch:{epoch+1}, 
-Train Commitment Loss: {np.array(self.losses['train']['commitment'][epoch]).mean()}, 
-Train Reconstruction Loss: {np.array(self.losses['train']['reconstruction'][epoch]).mean()}, 
-Train Quantization Tokens:
-{pd.DataFrame(pd.Series(self.losses['train']['quantization'][epoch]).value_counts()).T.to_markdown()}, 
+    Validation Commitment Loss: {np.array(self.losses['validation']['commitment'][epoch]).sum()},
+    Validation Reconstruction Loss: {np.array(self.losses['validation']['reconstruction'][epoch]).sum()},
+    Validation Quantization Tokens:
+    {pd.DataFrame(pd.Series(self.losses['validation']['quantization'][epoch]).value_counts()).T.to_markdown()}, 
+    ***
+            """)
 
-Validation Commitment Loss: {np.array(self.losses['validation']['commitment'][epoch]).mean()},
-Validation Reconstruction Loss: {np.array(self.losses['validation']['reconstruction'][epoch]).mean()},
-Validation Quantization Tokens:
-{pd.DataFrame(pd.Series(self.losses['validation']['quantization'][epoch]).value_counts()).T.to_markdown()}, 
-***
-            """
-            )
-        self.experiment.finish()
 
         # with open('loss.pkl', 'wb') as f:
         #   print(f"loss.pkl is saved to {os.getcwd()}")
