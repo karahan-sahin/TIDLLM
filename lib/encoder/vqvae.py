@@ -1,6 +1,9 @@
 import torch
 from torch import nn
-import torch.nn.functional as F
+
+"""
+Vector Quantized Variational AutoEncoder 
+"""
 
 class VQVAE(nn.Module):
     def __init__(self, encoder, decoder, vq):
@@ -14,8 +17,8 @@ class VQVAE(nn.Module):
 
     def quantize(self, x):
         z = self.encoder(x)
-        quantized, indices, commitment_loss = self.vq(z)
-        return indices
+        _, indices, _ = self.vq(z)
+        return z
 
     def forward(self, x):
         z = self.encoder(x)

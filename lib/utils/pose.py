@@ -166,7 +166,7 @@ def get_pose_estimation( video_path : str, with_info : bool = False) -> dict:
                     landmarks['pose'][landmark_name].append(np.array([
                         landmark.x,
                         landmark.y,
-                        landmark.z,
+                        # landmark.z, z coordinate is intentionally omitted, 20240423.
                     ]))
             else:
                 if with_info:
@@ -174,10 +174,9 @@ def get_pose_estimation( video_path : str, with_info : bool = False) -> dict:
                     
                 for landmark_name in landmarks['pose'].keys():
                     landmarks['pose'][landmark_name].append(np.array([
-                        None,
-                        None,
-                        None,
-                        None,
+                        0.0,
+                        0.0,
+                        #None, z coordinate is intentionally omitted, 20240423.
                     ]))
 
             if results.right_hand_landmarks:
@@ -186,7 +185,7 @@ def get_pose_estimation( video_path : str, with_info : bool = False) -> dict:
                     landmarks['right'][landmark_name].append(np.array([
                         landmark.x,
                         landmark.y,
-                        landmark.z,
+                        # landmark.z, z coordinate is intentionally omitted, 20240423.
                     ]))
             else:
                 if with_info:
@@ -194,10 +193,9 @@ def get_pose_estimation( video_path : str, with_info : bool = False) -> dict:
 
                 for landmark_name in landmarks['right'].keys():
                     landmarks['right'][landmark_name].append(np.array([
-                        None,
-                        None,
-                        None,
-                        None,
+                        0.0,
+                        0.0,
+                        # None, z coordinate is intentionally omitted, 20240423.
                     ]))
 
             if results.left_hand_landmarks:
@@ -206,7 +204,7 @@ def get_pose_estimation( video_path : str, with_info : bool = False) -> dict:
                     landmarks['left'][landmark_name].append(np.array([
                         landmark.x,
                         landmark.y,
-                        landmark.z,
+                        # landmark.z, z coordinate is intentionally omitted, 20240423.
                     ]))
             else:
                 if with_info:
@@ -214,9 +212,9 @@ def get_pose_estimation( video_path : str, with_info : bool = False) -> dict:
 
                 for landmark_name in landmarks['left'].keys():
                     landmarks['left'][landmark_name].append(np.array([
-                        None,
-                        None,
-                        None,
+                        0.0,
+                        0.0,
+                        # None, z coordinate is intentionally omitted, 20240423.
                     ]))
 
     video.release()
