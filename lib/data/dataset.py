@@ -39,17 +39,19 @@ class PoseDataset(Dataset):
             'token': self.tokens[idx],
             'frame': self.frames[idx]
         }
-
+    
 
 class PoseDistanceDataset(Dataset):
 
-    def __init__(self, 
-                 paths, 
+    def __init__(self,
+                 paths,
                  transform=None,
+                 depth=3,
                  window=5):
-        
+
         self.data = []
         self.paths = paths
+        self.depth = depth
         self.window = window
         self.generate_instances()
 
@@ -79,10 +81,10 @@ class PoseDistanceDataset(Dataset):
             'end_idx': end_idx
         }
 
-    @staticmethod
-    def collate_fn(batch):
+    def collate_fn(self, batch):
         # concatenate tensors into new axis
         data = torch.stack([torch.tensor(item['array']) for item in batch]).float().permute(0, 4, 1, 2, 3)
+        data = data[:, :self.depth, :, :, :]
         tokens = [item['token'] for item in batch]
         start_idx = [item['start_idx'] for item in batch]
         end_idx = [item['end_idx'] for item in batch]
@@ -92,4 +94,3 @@ class PoseDistanceDataset(Dataset):
             'start_idx': start_idx,
             'end_idx': end_idx
         }
-        
