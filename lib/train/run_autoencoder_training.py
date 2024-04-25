@@ -8,6 +8,18 @@ from torch import nn, optim
 import torch.nn.functional as F
 import wandb
 from lib.config import *
+import random
+import cv2
+from moviepy.editor import ImageSequenceClip
+
+# def codebook_diversity_loss(embedding_weights):
+#     normed_weights = F.normalize(embedding_weights, p=2, dim=1)
+#     similarity = torch.matmul(normed_weights, normed_weights.T)
+#     # Remove self-similarity by setting diagonal to zero
+#     similarity.fill_diagonal_(0)
+#     diversity_loss = torch.mean(similarity)
+#     return diversity_loss
+
 
 class AutoencoderTrainer:
     def __init__(
@@ -47,63 +59,88 @@ class AutoencoderTrainer:
             settings=wandb.Settings(start_method="fork"),
         )
 
-    def evaluate_model(self):
+    def evaluate_model(self, epoch):
         self.model.eval()
 
         dfs = []
-        for val_sample in tqdm(self.train_dataloader):
+        for sample in self.train_dataloader:
             with torch.no_grad():
                 quantized, indices, commitment_loss = self.model(
-                    val_sample["array"].float()
+                    sample["array"].to(self.device).float()
                 )
                 dfs.append(
                     pd.DataFrame(
                         {
-                            "videos": val_sample["token"],
+                            "videos": sample["tokens"],
                             "labels": indices.detach().cpu().numpy().reshape(-1),
-                            "frame": val_sample["frame"]
-                            .detach()
-                            .cpu()
-                            .numpy()
-                            .reshape(-1),
+                            "start_idx": sample["start_idx"],
+                            "end_idx": sample["end_idx"],
                         }
                     )
                 )
 
         df = pd.concat(dfs)
         sorted_id_list = (
-            pd.DataFrame(df["labels"].value_counts()).reset_index()["labels"].to_list()
+            pd.DataFrame(df["labels"].value_counts())
+            .reset_index()
+            .query("count > 3")["labels"]
+            .to_list()
         )
-        random_ids = random.sample(sorted_id_list[: len(sorted_id_list) // 3], 1)
+        random_id = random.choice(sorted_id_list)
+        print("RANDOM_ID", random_id)
+        videos = []
+        vid_names = []
+        imgs = []
+        for rec in df[df["labels"] == random_id].to_dict(orient="records"):
+            # save frame video to disk
+            video = rec["videos"].split(".")[0]
+            video_path = f"dataset/corpus/{video}.mp4"
+            start_idx = rec["start_idx"]
+            end_idx = rec["end_idx"]
+            label = rec["labels"]
 
-        for id in random_ids:
-            imgs = []
-            for rec in tqdm(df[df["labels"] == id].to_dict(orient="records")):
-                # save frame video to disk
-                video = rec["videos"].split(".")[0]
-                video_path = f"dataset/corpus/{video}.mp4"
-                frame_idx = rec["frame"]
-                label = rec["labels"]
+            cap = cv2.VideoCapture(video_path)
 
-                if video in [vid for img, vid in imgs]:
-                    continue
+            if not os.path.exists(f"analyze/quantization/{label}"):
+                os.mkdir(f"analyze/quantization/{label}")
 
-                cap = cv2.VideoCapture(video_path)
+            FRAMES = []
+            MAX = max(df[df["labels"] == random_id]["end_idx"])
+            for i in range(MAX):
                 ret, frame = cap.read()
-
-                for i in range(frame_idx):
-                    ret, frame = cap.read()
+                if i >= start_idx and i <= end_idx:
+                    h, w, c = frame.shape
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    if i == frame_idx - 1:
+                    FRAMES.append(frame)
+                    if (end_idx + start_idx) // 2 == i:
                         imgs.append((frame, video))
-                if len(imgs) >= 3:
-                    break
+            vid_names.append(video)
+            videos.append(FRAMES)
+            if len(videos) >= 3:
+                break
 
-            wandb_images = wandb.Image(
-                np.hstack([img for img, vid in imgs]),
-                caption=f"{id}, {[vid for img, vid in imgs]}",
-            )
-            self.experiment.log({"Inference Imgs": wandb_images})
+        videos = np.array(videos)
+        vid_frames = []
+        for i in range(videos.shape[1]):
+            img1 = videos[0][i]
+            img2 = videos[1][i]
+            img3 = videos[2][i]
+
+            stacked_imgs = np.hstack([img1, img2, img3])
+            vid_frames.append(stacked_imgs)
+        self.create_video_from_frames(
+            vid_frames, f"analyze/quantization/{random_id}/{epoch}.mp4"
+        )
+
+        wandb_img = wandb.Image(
+            np.hstack([img for img, vid in imgs]),
+            caption=f"{random_id}, {[vid for img, vid in imgs]}",
+        )
+        self.experiment.log({"Inference Id": wandb_img})
+
+    def create_video_from_frames(self, frames, output_file):
+        clip = ImageSequenceClip(frames, fps=5)
+        clip.write_videofile(output_file)
 
     def save_to_wandb(self, epoch):
         df = pd.DataFrame(
@@ -146,7 +183,7 @@ class AutoencoderTrainer:
             }
         )
 
-        self.evaluate_model()
+        self.evaluate_model(epoch)
 
     def train(self):
 
@@ -193,22 +230,24 @@ class AutoencoderTrainer:
                 )
 
             self.save_to_wandb(epoch)
-            
-            print(f"""
-    ***
-    Epoch:{epoch+1}, 
-    Train Commitment Loss: {np.array(self.losses['train']['commitment'][epoch]).sum()}, 
-    Train Reconstruction Loss: {np.array(self.losses['train']['reconstruction'][epoch]).sum()}, 
-    Train Quantization Tokens:
-    {pd.DataFrame(pd.Series(self.losses['train']['quantization'][epoch]).value_counts()).T.to_markdown()}, 
 
-    Validation Commitment Loss: {np.array(self.losses['validation']['commitment'][epoch]).sum()},
-    Validation Reconstruction Loss: {np.array(self.losses['validation']['reconstruction'][epoch]).sum()},
-    Validation Quantization Tokens:
-    {pd.DataFrame(pd.Series(self.losses['validation']['quantization'][epoch]).value_counts()).T.to_markdown()}, 
-    ***
-            """)
+            print(
+                f"""
+***
+Epoch:{epoch+1}, 
+Train Commitment Loss: {np.array(self.losses['train']['commitment'][epoch]).mean()}, 
+Train Reconstruction Loss: {np.array(self.losses['train']['reconstruction'][epoch]).mean()}, 
+Train Quantization Tokens:
+{pd.DataFrame(pd.Series(self.losses['train']['quantization'][epoch]).value_counts()).T.to_markdown()}, 
 
+Validation Commitment Loss: {np.array(self.losses['validation']['commitment'][epoch]).mean()},
+Validation Reconstruction Loss: {np.array(self.losses['validation']['reconstruction'][epoch]).mean()},
+Validation Quantization Tokens:
+{pd.DataFrame(pd.Series(self.losses['validation']['quantization'][epoch]).value_counts()).T.to_markdown()}, 
+***
+            """
+            )
+        self.experiment.finish()
 
         # with open('loss.pkl', 'wb') as f:
         #   print(f"loss.pkl is saved to {os.getcwd()}")
