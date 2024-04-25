@@ -2,9 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class CNNEncoder(nn.Module):
+"""
+CNN Encoder Decoder Networks
+"""
+
+class CNN3DEncoder(nn.Module):
     def __init__(self, input_channels):
-        super(CNNEncoder, self).__init__()
+        super(CNN3DEncoder, self).__init__()
         self.conv1 = nn.Conv3d(in_channels=input_channels, out_channels=32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv3d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
         self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
@@ -28,16 +32,16 @@ class CNNEncoder(nn.Module):
         return x
 
 
-class CNNDecoder(nn.Module):
+class CNN3DDecoder(nn.Module):
     def __init__(self, output_channels):
-        super(CNNDecoder, self).__init__()
+        super(CNN3DDecoder, self).__init__()
         # Assuming the output of the encoder before the fully connected layer was (64, D/4, H/4, W/4)
         # We start reversing from the output of the fully connected layer
         self.fc1 = nn.Linear(768, 64 * 18 * 18)
         
         self.conv1 = nn.Conv3d(64, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv3d(32, 16, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv3d(16, 3, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv3d(16, output_channels, kernel_size=3, stride=1, padding=1)
         self.upsample = nn.Upsample((5, 75, 75))
         self.relu = nn.ReLU()
 
