@@ -1,0 +1,1 @@
+Sign language recognition from videos is crucial for effective communication with deaf people. In this study, we will adopt language modeling strategies to the sign language domain by quantization of hand and body landmarks in spatial and temporal basis by utilizing graph convolutional networks.
