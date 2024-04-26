@@ -8,6 +8,13 @@ from torch import nn, optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
+import cv2
+import wandb
+import random
+from lib.config import *
+from moviepy.editor import ImageSequenceClip
+
+
 class AutoTrainer():
 
     def __init__(self,
@@ -36,6 +43,7 @@ class AutoTrainer():
         self.epochs = epochs
         self.learning_rate = learning_rate
 
+        self.log_dir = log_dir
         self.model_path = model_path
 
         self.optimizer = torch.optim.Adam(
@@ -58,6 +66,11 @@ class AutoTrainer():
             collate_fn=eval_dataset.collate_fn
         )
 
+        self.experiment = wandb.init(
+            project="TIDLLM",
+            config=GLOBAL_CONFIG,
+            settings=wandb.Settings(start_method="fork"),
+        )
 
         self.logs = {
             'train': {
@@ -81,6 +94,132 @@ class AutoTrainer():
                   for e in range(self.epochs) },
             }
         }
+
+    def evaluate_model(self, epoch):
+      self.model.eval()
+
+      dfs = []
+      for sample in self.train_dataloader:
+          with torch.no_grad():
+              quantized, indices, commitment_loss = self.model(
+                  sample["array"].to(self.device).float()
+              )
+              dfs.append(
+                  pd.DataFrame(
+                      {
+                          "videos": sample["tokens"],
+                          "labels": indices.detach().cpu().numpy().reshape(-1),
+                          "start_idx": sample["start_idx"],
+                          "end_idx": sample["end_idx"],
+                      }
+                  )
+              )
+
+      df = pd.concat(dfs)
+      sorted_id_list = (
+          pd.DataFrame(df["labels"].value_counts())
+          .reset_index()
+          .query("count > 3")["labels"]
+          .to_list()
+      )
+      random_id = random.choice(sorted_id_list)
+      print("RANDOM_ID", random_id)
+      videos = []
+      vid_names = []
+      imgs = []
+      for rec in df[df["labels"] == random_id].to_dict(orient="records"):
+          # save frame video to disk
+          video = rec["videos"].split(".")[0]
+          video_path = f"dataset/corpus/{video}.mp4"
+          start_idx = rec["start_idx"]
+          end_idx = rec["end_idx"]
+          label = rec["labels"]
+
+          cap = cv2.VideoCapture(video_path)
+
+          if not os.path.exists(f"analyze/quantization/{label}"):
+              os.mkdir(f"analyze/quantization/{label}")
+
+          FRAMES = []
+          MAX = max(df[df["labels"] == random_id]["end_idx"])
+          for i in range(MAX):
+              ret, frame = cap.read()
+              if i >= start_idx and i <= end_idx:
+                  h, w, c = frame.shape
+                  frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                  FRAMES.append(frame)
+                  if (end_idx + start_idx) // 2 == i:
+                      imgs.append((frame, video))
+          vid_names.append(video)
+          videos.append(FRAMES)
+          if len(videos) >= 3:
+              break
+
+      videos = np.array(videos)
+      vid_frames = []
+      for i in range(videos.shape[1]):
+          img1 = videos[0][i]
+          img2 = videos[1][i]
+          img3 = videos[2][i]
+
+          stacked_imgs = np.hstack([img1, img2, img3])
+          vid_frames.append(stacked_imgs)
+      self.create_video_from_frames(
+          vid_frames, f"analyze/quantization/{random_id}/{epoch}.mp4"
+      )
+
+      wandb_img = wandb.Image(
+          np.hstack([img for img, vid in imgs]),
+          caption=f"{random_id}, {[vid for img, vid in imgs]}",
+      )
+      self.experiment.log({"Inference Id": wandb_img})
+
+    def create_video_from_frames(self, frames, output_file):
+      clip = ImageSequenceClip(frames, fps=5)
+      clip.write_videofile(output_file)
+
+    def save_to_wandb(self, epoch):
+      df = pd.DataFrame(
+          pd.Series(self.losses["train"]["quantization"][epoch]).value_counts()
+      )
+      transposed_df = df.reset_index()
+      transposed_df.columns = ["id", "count"]
+
+      self.experiment.log(
+          {
+              "train_commitment_loss": np.array(
+                  self.losses["train"]["commitment"][epoch]
+              ).mean(),
+              "train_reconstruction_loss": np.array(
+                  self.losses["train"]["reconstruction"][epoch]
+              ).mean(),
+              "train_quantization_token_count": wandb.Table(
+                  data=transposed_df, columns=transposed_df.columns.to_list()
+              ),
+          }
+      )
+
+      df = pd.DataFrame(
+          pd.Series(self.losses["validation"]["quantization"][epoch]).value_counts()
+      )
+      transposed_df = df.reset_index()
+      transposed_df.columns = ["id", "count"]
+
+      self.experiment.log(
+          {
+              "val_commitment_loss": np.array(
+                  self.losses["validation"]["commitment"][epoch]
+              ).mean(),
+              "val_reconstruction_loss": np.array(
+                  self.losses["validation"]["reconstruction"][epoch]
+              ).mean(),
+              "val_quantization_token_count": wandb.Table(
+                  data=transposed_df, columns=transposed_df.columns.to_list()
+              ),
+          }
+      )
+
+      self.evaluate_model(epoch)
 
     def train(self):
 
@@ -146,6 +285,8 @@ class AutoTrainer():
             torch.save(self.model.state_dict(), self.model_path)
 
             self.write_logs(epoch)
+
+            self.save_to_wandb(epoch)
 
             print(f"Train Loss: {np.sum(self.logs['train']['loss'][epoch+self.start_epoch])}")
             print(f"Validation Loss: {np.sum(self.logs['validation']['loss'][epoch+self.start_epoch])}")

@@ -1,24 +1,58 @@
 import cv2
+import torch
 import pandas as pd
 from tqdm.notebook import tqdm
+from torch.utils.data import DataLoader
 from moviepy.editor import VideoFileClip
+
+def get_quantization(model, dataset):
+
+    model.eval()
+    dataloader = DataLoader(
+        dataset, 
+        batch_size=10, 
+        shuffle=True,
+        collate_fn=dataset.collate_fn   
+    )
+
+    dfs = []
+    for train_sample in tqdm(dataloader):
+        with torch.no_grad():
+            quantized, indices, commitment_loss = model(train_sample['array'].float())
+            quant = {
+                'vocab': train_sample['tokens'],
+                'start_idx': train_sample['start_idx'],
+                'end_idx': train_sample['end_idx']
+            }
+
+            for index in range(indices.shape[1]):
+                quant[f'Code_{index}'] = indices[:, index].cpu().numpy()
+
+            dfs.append(pd.DataFrame(quant))
+
+    df = pd.concat(dfs)
+    df.start_idx = df.start_idx.astype(int)
+    df.end_idx = df.end_idx.astype(int)
+
+    return df
+
+    
 
 def dump_quantization(
     df: pd.DataFrame,
-    CODEBOOK: str,
-    CODE_ID: int,
     video_path: str,      
+    num_quantizers: int, 
     quantization_path: str
 ):
-    for rec in tqdm(df[df[CODEBOOK] == CODE_ID].to_dict(orient='records')):
+    for rec in tqdm(df.to_dict(orient='records')):
         # save frame video to disk
         video = rec['vocab']
-        video_path = f"{video_path}/{video}.mp4"
+        v_path = f"{video_path}/{video}.mp4"
         start_idx = rec['start_idx']
         end_idx = rec['end_idx']
-        label = rec['Code_1']
+        label = '_'.join([ str(rec[f'Code_{i}']) for i in range(num_quantizers) ])
 
-        cap = cv2.VideoCapture(video_path)
+        cap = cv2.VideoCapture(v_path)
         ret, frame = cap.read()
         
         import os
