@@ -1,4 +1,3 @@
-
 class BODY_LANDMARKS:
     NOSE = 0
     LEFT_EYE_INNER = 1
@@ -33,6 +32,7 @@ class BODY_LANDMARKS:
     RIGHT_HEEL = 30
     LEFT_FOOT_INDEX = 31
     RIGHT_FOOT_INDEX = 32
+
 
 class HAND_LANDMARKS:
     WRIST = 0

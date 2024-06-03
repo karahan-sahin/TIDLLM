@@ -1,5 +1,7 @@
 torch
-opencv-python
-# medipipe
-vector-quantize-pytorch
-torch_geometric
+opencv-python==4.9.0.80
+mediapipe==0.10.11
+vector-quantize-pytorch==1.14.6
+torch_geometric==2.5.2
+wandb
+moviepy

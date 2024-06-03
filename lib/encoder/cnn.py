@@ -5,18 +5,19 @@ import torch.nn.functional as F
 from lib.utils.pooling import Pooling
 from lib.utils.activation import Activation
 
+
 class CNN3dEncoder(nn.Module):
     def __init__(
-        self, 
-        model_name, 
-        input_size, 
-        conv_layers, 
-        linear_layers, 
-        output_size, 
+        self,
+        model_name,
+        input_size,
+        conv_layers,
+        linear_layers,
+        output_size,
         out_channels=3,
         channel_size=2,
         depth_size=25,
-        log=False
+        log=False,
     ):
 
         super(CNN3dEncoder, self).__init__()
@@ -28,8 +29,8 @@ class CNN3dEncoder(nn.Module):
         self.input_size = (1, channel_size, depth_size, input_size[3], input_size[4])
         self.log = log
 
-        conv_layers[0]['in_channels'] = self.input_size[1]
-        conv_layers[-1]['out_channels'] = out_channels
+        conv_layers[0]["in_channels"] = self.input_size[1]
+        conv_layers[-1]["out_channels"] = out_channels
         ###############
         # CONV LAYERS #
         ###############
@@ -40,7 +41,7 @@ class CNN3dEncoder(nn.Module):
             self.conv_layers.append(self.make_conv_layer(layer))
             self.register_module(f"ENCODER_CONV_{idx}", self.conv_layers[-1])
 
-            print(f'encoder_conv_{idx}', layer)
+            print(f"encoder_conv_{idx}", layer)
 
         self.output_size = self.calculate_output_size(self.input_size)
 
@@ -107,7 +108,7 @@ class CNN3dEncoder(nn.Module):
             ),
             nn.BatchNorm3d(layer["out_channels"]),
             Activation(layer["activation"]),
-            Pooling[layer['pooling']](
+            Pooling[layer["pooling"]](
                 kernel_size=layer["pooling_kernel_size"], stride=layer["pooling_stride"]
             ),
         )
@@ -116,7 +117,8 @@ class CNN3dEncoder(nn.Module):
 
         for idx, layer in enumerate(self.conv_layers):
             x = layer(x)
-            if self.log: print(f"Encoder_Conv_{idx} layer output shape:", x.shape)
+            if self.log:
+                print(f"Encoder_Conv_{idx} layer output shape:", x.shape)
 
         x = x.reshape(
             -1,
@@ -128,11 +130,12 @@ class CNN3dEncoder(nn.Module):
 
         for idx, layer in enumerate(self.linear_layers):
             x = layer(x)
-            if self.log: print(f"Encoder_Linear_{idx} layer output shape:", x.shape)
+            if self.log:
+                print(f"Encoder_Linear_{idx} layer output shape:", x.shape)
 
         x = self.output_layer(x)
         return x
-    
+
 
 class CNN3dDecoder(nn.Module):
     def __init__(
@@ -158,7 +161,7 @@ class CNN3dDecoder(nn.Module):
             output_size (int): output size
             log (bool, optional): log the output shape. Defaults to False.
             upsampling_mode (str, optional): upsampling mode. Defaults to "trilinear".
-        
+
         Example:
         ```
         model = CNN3dDecoder(
@@ -191,12 +194,11 @@ class CNN3dDecoder(nn.Module):
         )
         ```
         """
-        
+
         super(CNN3dDecoder, self).__init__()
 
         self.model_name = model_name
         self.log = log
-
 
         #################
         # LINEAR LAYERS #
@@ -205,7 +207,7 @@ class CNN3dDecoder(nn.Module):
 
         self.linear_layers = []
         # Update the last linear layer out_features
-        linear_layers[0]['in_features'] = linear_input
+        linear_layers[0]["in_features"] = linear_input
         linear_layers[-1]["out_features"] = (
             self.input_size[1]
             * self.input_size[2]
@@ -214,7 +216,7 @@ class CNN3dDecoder(nn.Module):
         )
 
         for idx, layer in enumerate(linear_layers):
-            print(f'decoder_linear_out_{idx}:',layer)
+            print(f"decoder_linear_out_{idx}:", layer)
             self.linear_layers.append(self.make_linear_layer(layer))
             self.register_module(f"DECODER_LINEAR_{idx}", self.linear_layers[-1])
 
@@ -228,7 +230,7 @@ class CNN3dDecoder(nn.Module):
 
         self.conv_transpose_layers = []
         for idx, layer in enumerate(conv_transpose_layers):
-            print(f'decoder_conv_out_{idx}:',layer)
+            print(f"decoder_conv_out_{idx}:", layer)
             self.conv_transpose_layers.append(self.make_conv_transpose_layer(layer))
             self.register_module(
                 f"DECODER_CONVTRANSPOSE_{idx}", self.conv_transpose_layers[-1]
@@ -256,10 +258,12 @@ class CNN3dDecoder(nn.Module):
         )
         for idx, layer in enumerate(self.conv_transpose_layers):
             x = layer(x)
-            if self.log: print(f"Decoder_Conv_{idx} layer output shape:", x.shape)
+            if self.log:
+                print(f"Decoder_Conv_{idx} layer output shape:", x.shape)
 
         x = self.upsample(x)
-        if self.log: print("Upsample layer output shape:", x.shape)
+        if self.log:
+            print("Upsample layer output shape:", x.shape)
 
         return x
 
